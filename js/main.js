@@ -2,15 +2,36 @@
   const $ = (id) => document.getElementById(id);
   $('yr').textContent = new Date().getFullYear();
 
-  // Tabs
-  document.querySelectorAll('.tab').forEach((t) =>
-    t.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach((x) => x.classList.remove('on'));
-      document.querySelectorAll('.pane').forEach((x) => x.classList.remove('on'));
-      t.classList.add('on');
-      $(t.dataset.t).classList.add('on');
-    })
-  );
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  const tablist = document.querySelector('[role="tablist"]');
+  function activateTab(tab, moveFocus = false) {
+    tabs.forEach((item) => {
+      const active = item === tab;
+      const panel = $(item.dataset.t);
+      item.classList.toggle('on', active);
+      item.setAttribute('aria-selected', String(active));
+      item.tabIndex = active ? 0 : -1;
+      panel.classList.toggle('on', active);
+      panel.hidden = !active;
+    });
+    if (moveFocus) tab.focus();
+  }
+  tabs.forEach((tab) => {
+    $(tab.dataset.t).hidden = !tab.classList.contains('on');
+    tab.addEventListener('click', () => activateTab(tab));
+  });
+  tablist.addEventListener('keydown', (event) => {
+    const current = tabs.indexOf(document.activeElement);
+    if (current < 0) return;
+    let next = current;
+    if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+    else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    activateTab(tabs[next], true);
+  });
 
   const nodes = [...document.querySelectorAll('#pipe .node')];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -159,4 +180,65 @@ Release readiness: GREEN with 1 pending review.`;
 
   $('run').addEventListener('click', run);
   $('reset').addEventListener('click', () => { if (!busy) resetOutputs(); });
+
+  const navLinks = [...document.querySelectorAll('nav a[href^="#"]')];
+  const sections = navLinks.map((link) => $(link.hash.slice(1))).filter(Boolean);
+  let activeSectionId = '';
+  function setActiveSection(id) {
+    if (id === activeSectionId) return;
+    activeSectionId = id;
+    navLinks.forEach((link) => {
+      if (link.hash === `#${id}`) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+  }
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if ('IntersectionObserver' in window && !reducedMotion) {
+    document.body.classList.add('reveal-ready');
+    const revealTargets = document.querySelectorAll(
+      'section .wrap > h2, section .wrap > .sub, .grid > .card, .tl > .job, section .wrap > .pipe, section .wrap > .demo, section .wrap > .tblwrap, section .wrap > .card'
+    );
+    const revealObserver = new IntersectionObserver((entries, observer) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    revealTargets.forEach((target) => {
+      target.classList.add('reveal');
+      revealObserver.observe(target);
+    });
+  }
+
+  const progress = $('scroll-progress');
+  const backToTop = $('back-to-top');
+  function updateScrollUI() {
+    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+    const percentage = scrollable > 0 ? Math.min(window.scrollY / scrollable, 1) : 0;
+    progress.style.transform = `scaleX(${percentage})`;
+    backToTop.hidden = window.scrollY < 480;
+    const activeSection = scrollable > 0 && window.scrollY >= scrollable - 1
+      ? sections[sections.length - 1]
+      : sections.reduce(
+        (active, section) => section.getBoundingClientRect().top <= window.innerHeight * 0.3 ? section : active,
+        sections[0]
+      );
+    if (activeSection) setActiveSection(activeSection.id);
+  }
+  let scrollFrame = 0;
+  window.addEventListener('scroll', () => {
+    if (scrollFrame) return;
+    scrollFrame = window.requestAnimationFrame(() => {
+      updateScrollUI();
+      scrollFrame = 0;
+    });
+  }, { passive: true });
+  window.addEventListener('resize', updateScrollUI);
+  backToTop.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+  });
+  updateScrollUI();
 })();
