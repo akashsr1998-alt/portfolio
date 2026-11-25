@@ -22,11 +22,13 @@ python -m http.server 8000   # then visit http://localhost:8000
 ```
 
 ## Deploy (GitHub Pages)
+
+GitHub Pages is configured to publish the `main` branch from the repository root. Pushes to `main` deploy automatically; the site may take a few minutes to update.
+
 ```bash
 git add .
 git commit -m "Update portfolio"
 git push origin main
 ```
-Then go to **Settings → Pages → Deploy from a branch → main / (root) → Save**.
 
 > Note: the agent demo is a front-end simulation. It does not call a real LLM.
